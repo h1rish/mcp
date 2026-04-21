@@ -82,6 +82,23 @@ def ping():
 
 
 # =========================
+# 🆕 TEST ENDPOINT (FOR BROWSER)
+# =========================
+
+@app.get("/tools/get_student_test")
+def get_student_test():
+    return {
+        "tool": "get_student_test",
+        "data": {
+            "id": "101",
+            "name": "John Doe",
+            "course": "AI & ML",
+            "marks": 85
+        }
+    }
+
+
+# =========================
 # BASIC ENDPOINTS
 # =========================
 
