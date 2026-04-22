@@ -28,7 +28,7 @@ def get_memory(user_id: str):
 
 
 # =========================
-# CORE LOGIC
+# TOOL LOGIC
 # =========================
 def get_student(student_id: str):
     return {
@@ -40,7 +40,7 @@ def get_student(student_id: str):
 
 
 # =========================
-# MCP ENDPOINT (FIXED FOR AI FOUNDRY)
+# MCP ENDPOINT (FOUNDARY-COMPATIBLE)
 # =========================
 @app.post("/mcp")
 async def mcp_handler(request: Request, x_api_key: str = Header(None)):
@@ -60,11 +60,11 @@ async def mcp_handler(request: Request, x_api_key: str = Header(None)):
                 "tools": [
                     {
                         "name": "get_student",
-                        "description": "Get student details by ID"
+                        "description": "Fetch student details by student_id"
                     },
                     {
                         "name": "save_memory",
-                        "description": "Save user memory"
+                        "description": "Save user memory key-value pair"
                     },
                     {
                         "name": "get_memory",
@@ -75,29 +75,30 @@ async def mcp_handler(request: Request, x_api_key: str = Header(None)):
         }
 
     # -------------------------
-    # CALL TOOLS
+    # CALL TOOL
     # -------------------------
     if method == "tools/call":
-        tool = body["params"]["name"]
-        args = body["params"]["arguments"]
+        params = body.get("params", {})
+        tool_name = params.get("name")
+        args = params.get("arguments", {})
 
-        # get_student
-        if tool == "get_student":
+        # ---- get_student ----
+        if tool_name == "get_student":
             return {
                 "id": req_id,
                 "result": get_student(args["student_id"])
             }
 
-        # save_memory
-        if tool == "save_memory":
+        # ---- save_memory ----
+        if tool_name == "save_memory":
             save_memory(args["user_id"], args["key"], args["value"])
             return {
                 "id": req_id,
                 "result": {"status": "saved"}
             }
 
-        # get_memory
-        if tool == "get_memory":
+        # ---- get_memory ----
+        if tool_name == "get_memory":
             return {
                 "id": req_id,
                 "result": get_memory(args["user_id"])
