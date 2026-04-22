@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Request, Header, HTTPException
 from typing import Dict, Any
 
 app = FastAPI()
@@ -14,14 +14,12 @@ def verify_key(x_api_key: str = Header(None)):
 
 
 # =========================
-# MEMORY STORE
+# SIMPLE MEMORY
 # =========================
 memory_store: Dict[str, Dict[str, Any]] = {}
 
 def save_memory(user_id: str, key: str, value: Any):
-    if user_id not in memory_store:
-        memory_store[user_id] = {}
-    memory_store[user_id][key] = value
+    memory_store.setdefault(user_id, {})[key] = value
 
 def get_memory(user_id: str):
     return memory_store.get(user_id, {})
@@ -40,19 +38,21 @@ def get_student(student_id: str):
 
 
 # =========================
-# MCP ENDPOINT (FOUNDARY-COMPATIBLE)
+# MCP ENDPOINT (ROBUST)
 # =========================
 @app.post("/mcp")
-async def mcp_handler(request: Request, x_api_key: str = Header(None)):
+async def mcp(request: Request, x_api_key: str = Header(None)):
     verify_key(x_api_key)
 
     body = await request.json()
+
     method = body.get("method")
     req_id = body.get("id", 1)
+    params = body.get("params", {})
 
-    # -------------------------
-    # LIST TOOLS
-    # -------------------------
+    # =========================
+    # tools/list
+    # =========================
     if method == "tools/list":
         return {
             "id": req_id,
@@ -60,65 +60,91 @@ async def mcp_handler(request: Request, x_api_key: str = Header(None)):
                 "tools": [
                     {
                         "name": "get_student",
-                        "description": "Fetch student details by student_id"
+                        "description": "Get student details by ID",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "student_id": {"type": "string"}
+                            },
+                            "required": ["student_id"]
+                        }
                     },
                     {
                         "name": "save_memory",
-                        "description": "Save user memory key-value pair"
+                        "description": "Save user memory",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "user_id": {"type": "string"},
+                                "key": {"type": "string"},
+                                "value": {}
+                            },
+                            "required": ["user_id", "key", "value"]
+                        }
                     },
                     {
                         "name": "get_memory",
-                        "description": "Retrieve user memory"
+                        "description": "Get user memory",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "user_id": {"type": "string"}
+                            },
+                            "required": ["user_id"]
+                        }
                     }
                 ]
             }
         }
 
-    # -------------------------
-    # CALL TOOL
-    # -------------------------
+    # =========================
+    # tools/call
+    # =========================
     if method == "tools/call":
-        params = body.get("params", {})
         tool_name = params.get("name")
         args = params.get("arguments", {})
 
-        # ---- get_student ----
         if tool_name == "get_student":
             return {
                 "id": req_id,
-                "result": get_student(args["student_id"])
+                "result": get_student(args.get("student_id"))
             }
 
-        # ---- save_memory ----
         if tool_name == "save_memory":
-            save_memory(args["user_id"], args["key"], args["value"])
+            save_memory(
+                args.get("user_id"),
+                args.get("key"),
+                args.get("value")
+            )
             return {
                 "id": req_id,
                 "result": {"status": "saved"}
             }
 
-        # ---- get_memory ----
         if tool_name == "get_memory":
             return {
                 "id": req_id,
-                "result": get_memory(args["user_id"])
+                "result": get_memory(args.get("user_id"))
             }
 
-    # -------------------------
-    # UNKNOWN METHOD
-    # -------------------------
+    # =========================
+    # fallback (important for Azure quirks)
+    # =========================
     return {
         "id": req_id,
-        "error": f"Unknown method: {method}"
+        "result": {
+            "error": "Unknown method",
+            "method_received": method
+        }
     }
 
 
 # =========================
-# BASIC ENDPOINTS
+# HEALTH CHECK
 # =========================
 @app.get("/")
 def home():
-    return {"message": "MCP Server Running 🚀"}
+    return {"status": "MCP Server Running"}
 
 @app.get("/health")
 def health():
